@@ -1,5 +1,6 @@
 import statistics
 from scipy.ndimage import histogram
+from scipy.stats import linregress
 import cv2
 import numpy as np
 import time
@@ -7,6 +8,7 @@ import signal
 import sys
 import threading
 import copy
+
 
 GLOBAL_ROI_ARRAY = []
 gaussian_kernel = 101
@@ -44,6 +46,13 @@ def find_geographic_center(list_of_points):
     x_avg = sum(x_vals) / len(x_vals)
     y_avg = sum(y_vals) / len(y_vals)
     return (int(x_avg), int(y_avg))
+
+
+def calculate_linear_best_fit(list_of_points):
+    x_array = np.linspace(1, len(list_of_points), len(list_of_points), dtype=np.intc)
+    res = linregress(x_array, np.array(list_of_points))
+    return int((res.intercept + int(len(list_of_points)/2)*res.slope))
+
 
 def calculate_ROI(image1, previous_location):
     global GLOBAL_ROI_ARRAY
