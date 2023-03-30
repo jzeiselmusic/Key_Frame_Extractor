@@ -18,8 +18,7 @@ ORIG_ROWS = 720
 ORIG_COLS = 1280
 ROWS = 200
 COLUMNS = 200
-
-COOL_DOWN_VAL = 100
+COOL_DOWN_VAL = 20
 #q = 10
 
 blur_kernel = np.ones((KERNEL,KERNEL),np.float32)/(KERNEL*KERNEL)
@@ -77,3 +76,10 @@ def calculate_ROI(image1, previous_location):
         GLOBAL_ROI_ARRAY.append(image1)
         return None, None
     
+
+def is_key_frame(movement_list):
+    if movement_list[-1] < ((movement_list[-2] + movement_list[-3] + movement_list[-4] + movement_list[-5]) / 5) * .7:
+        if movement_list[-1] > 500:
+            return True
+    else:
+        return False

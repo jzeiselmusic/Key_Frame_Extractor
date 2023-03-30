@@ -28,6 +28,7 @@ def data_processing():
     ## variables written to by this thread
     images = []
     entropy_vals = []
+    movement_list = [0,0,0,0,0]
     keyframe = False
     cooldown = True
     cool_counter = 0
@@ -41,52 +42,58 @@ def data_processing():
     while(True):
         if kill_threads == True:
             break
-        if (len(images) > 50000):
-            images.pop(0)
-            entropy_vals.pop(0)
+        #if (len(images) > 50000):
+        #    images.pop(0)
+        #    entropy_vals.pop(0)
 
         if cooldown==True:
             cool_counter += 1
             if cool_counter >= COOL_DOWN_VAL:
                     cooldown = False
                     cool_counter = 0
-        if (count % 20 == 0):
-            images.append(frame)
-            hist = np.array(histogram(np.array(images), 0, 255, 256))
-            hist = hist/sum(hist)
-            entropy = calculate_entropy(hist)
-            if len(entropy_vals) > 2:
-                if cooldown == False:
-                    if ((entropy_vals[-1] > entropy_vals[-2]) and (entropy_vals[-1] > entropy)) or\
-                        ((entropy_vals[-1] < entropy_vals[-2] and entropy_vals[-1] < entropy)):
-                        keyframe = True
-                        cooldown = True
-                    else:
-                        keyframe = False
-            entropy_vals.append(entropy)
+        #if (count % 20 == 0):
+        #    images.append(frame)
+        #    hist = np.array(histogram(np.array(images), 0, 255, 256))
+        #    hist = hist/sum(hist)
+        #    entropy = calculate_entropy(hist)
+        #    if len(entropy_vals) > 2:
+        #        if cooldown == False:
+        #            if ((entropy_vals[-1] > entropy_vals[-2]) and (entropy_vals[-1] > entropy)) or\
+        #                ((entropy_vals[-1] < entropy_vals[-2] and entropy_vals[-1] < entropy)):
+        #                keyframe = True
+        #                cooldown = True
+        #            else:
+        #                keyframe = False
+        #    entropy_vals.append(entropy)
 
         max_val_location_temp, saliency_map =calculate_ROI(frame, previous_max_val_location)
 
         if max_val_location_temp is not None:
+            movement_list.append(np.sum(saliency_map/255))
+            #print(np.sum(saliency_map/255))
+            keyframe = is_key_frame(movement_list)
+            #if (keyframe):
+                #cooldown = True
             mvltnumpy = np.array(max_val_location_temp)
             max_val_input_tracker.append(mvltnumpy)
 
-            max_val_location_x = calculate_linear_best_fit([int(n[0]) for n in max_val_input_tracker][-15:])
-            max_val_location_y = calculate_linear_best_fit([int(n[1]) for n in max_val_input_tracker][-15:])
+            #max_val_location_x = calculate_linear_best_fit([int(n[0]) for n in max_val_input_tracker][-15:])
+            #max_val_location_y = calculate_linear_best_fit([int(n[1]) for n in max_val_input_tracker][-15:])
         
-            max_val_location = (max_val_location_x, max_val_location_y)
-            #max_val_location = (9.2673e-03)*mvltnumpy + (7.4138e-02)*max_val_input_tracker[-1]\
-            #                    +(2.5948e-01)*max_val_input_tracker[-2] + (5.1897e-01)*max_val_input_tracker[-3]\
-            #                    +(6.4871e-01)*max_val_input_tracker[-4] + (5.1897e-01)*max_val_input_tracker[-5]\
-            #                    +(2.5948e-01)*max_val_input_tracker[-6] + (7.4138e-02)*max_val_input_tracker[-7]\
-            #                    +(9.2673e-03)*max_val_input_tracker[-8]\
-            #                    -(-6.1930e-16)*max_val_output_tracker[-1] - (1.0609e+00)*max_val_output_tracker[-2]\
-            #                    -(-4.4087e-16)*max_val_output_tracker[-3] - (2.9089e-01)*max_val_output_tracker[-4]\
-            #                    -(-6.8339e-17)*max_val_output_tracker[-5] - (2.0430e-02)*max_val_output_tracker[-6]\
-            #                    -(-2.0086e-18)*max_val_output_tracker[-7] - (1.7177e-04)*max_val_output_tracker[-8]
+            #max_val_location = (max_val_location_x, max_val_location_y)
+            max_val_location = (9.2673e-03)*mvltnumpy + (7.4138e-02)*max_val_input_tracker[-1]\
+                                +(2.5948e-01)*max_val_input_tracker[-2] + (5.1897e-01)*max_val_input_tracker[-3]\
+                                +(6.4871e-01)*max_val_input_tracker[-4] + (5.1897e-01)*max_val_input_tracker[-5]\
+                                +(2.5948e-01)*max_val_input_tracker[-6] + (7.4138e-02)*max_val_input_tracker[-7]\
+                                +(9.2673e-03)*max_val_input_tracker[-8]\
+                                -(-6.1930e-16)*max_val_output_tracker[-1] - (1.0609e+00)*max_val_output_tracker[-2]\
+                                -(-4.4087e-16)*max_val_output_tracker[-3] - (2.9089e-01)*max_val_output_tracker[-4]\
+                                -(-6.8339e-17)*max_val_output_tracker[-5] - (2.0430e-02)*max_val_output_tracker[-6]\
+                                -(-2.0086e-18)*max_val_output_tracker[-7] - (1.7177e-04)*max_val_output_tracker[-8]
             max_val_output_tracker.append(max_val_location)
             max_val_output_tracker.pop(0)
             max_val_input_tracker.pop(0)
+            movement_list.pop(0)
             previous_max_val_location = max_val_location
 
 
