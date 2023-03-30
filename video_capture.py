@@ -2,22 +2,8 @@ from utils import *
 from memory_profiler import profile
 
 ## global variables accessed by all threads
-images = []
-keyframe_images = []
-entropy_vals = []
-keyframe = False
-cooldown = True
 kill_threads = False
-cool_counter = 0
-
-max_val_input_tracker = [np.array([n,n]) for n in [0]*20]
-max_val_output_tracker = [np.array([n,n]) for n in [0]*20]
-max_val_location, saliency_map, max_val_location_temp = None, None, None
 count = 0
-previous_max_val_location = (0,0)
-
-text = "NORMAL"
-color = (0,255,255)
 
 
 def signal_handler(signal, frame):
@@ -31,19 +17,25 @@ def signal_handler(signal, frame):
 
 #@profile
 def data_processing():
-    global images
-    global entropy_vals
     global text
     global color
-    global cool_counter
     global cooldown
     global keyframe
     global max_val_location_temp
     global max_val_location
     global saliency_map
-    global previous_max_val_location
-    global max_val_input_tracker
-    global max_val_output_tracker
+
+    ## variables written to by this thread
+    images = []
+    entropy_vals = []
+    keyframe = False
+    cooldown = True
+    cool_counter = 0
+
+    max_val_input_tracker = [np.array([n,n]) for n in [0]*20]
+    max_val_output_tracker = [np.array([n,n]) for n in [0]*20]
+    max_val_location, saliency_map, max_val_location_temp = None, None, None
+    previous_max_val_location = (0,0)
 
     time.sleep(2)
     while(True):
@@ -63,18 +55,15 @@ def data_processing():
             hist = np.array(histogram(np.array(images), 0, 255, 256))
             hist = hist/sum(hist)
             entropy = calculate_entropy(hist)
-            entropy_vals.append(entropy)
             if len(entropy_vals) > 2:
-                print("here 1")
                 if cooldown == False:
-                    print("here 2")
                     if ((entropy_vals[-1] > entropy_vals[-2]) and (entropy_vals[-1] > entropy)) or\
                         ((entropy_vals[-1] < entropy_vals[-2] and entropy_vals[-1] < entropy)):
-                        print("here 3")
                         keyframe = True
                         cooldown = True
                     else:
                         keyframe = False
+            entropy_vals.append(entropy)
 
         max_val_location_temp, saliency_map =calculate_ROI(frame, previous_max_val_location)
 
@@ -82,10 +71,8 @@ def data_processing():
             mvltnumpy = np.array(max_val_location_temp)
             max_val_input_tracker.append(mvltnumpy)
 
-            #print(max_val_input_tracker)
-            #print([int(n[0]) for n in max_val_input_tracker])
-            max_val_location_x = calculate_linear_best_fit([int(n[0]) for n in max_val_input_tracker][-10:])
-            max_val_location_y = calculate_linear_best_fit([int(n[1]) for n in max_val_input_tracker][-10:])
+            max_val_location_x = calculate_linear_best_fit([int(n[0]) for n in max_val_input_tracker][-15:])
+            max_val_location_y = calculate_linear_best_fit([int(n[1]) for n in max_val_input_tracker][-15:])
         
             max_val_location = (max_val_location_x, max_val_location_y)
             #max_val_location = (9.2673e-03)*mvltnumpy + (7.4138e-02)*max_val_input_tracker[-1]\
