@@ -8,6 +8,7 @@ import signal
 import sys
 import threading
 import copy
+import os
 
 
 GLOBAL_ROI_ARRAY = []
