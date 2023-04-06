@@ -60,8 +60,9 @@ def gest_rec(cropped_image):
 
 
 def image_save(image, image_count, row_start, row_end, column_start, column_end):
-    # flip image and expand ROI boundaries because the ROI was calculated using 200x200 instead of 720x1280
-    rect_image = cv2.flip(image[int(row_start*3.7):int(row_end*3.7), int(column_start*6.4):int(column_end*6.4)], 1)
+    # flip image and expand ROI boundaries because the ROI was calculated using ROWSxCOLS instead of ORIG_ROWSxORIG_COLS
+    rect_image = cv2.flip(image[int(row_start*ORIG_ROWS/ROWS):int(row_end*ORIG_ROWS/ROWS),
+                                 int(column_start*ORIG_COLS/COLS):int(column_end*ORIG_COLS/COLS)], 1)
     try:
         gest_rec_thread = threading.Thread(target=gest_rec, args=[rect_image])
         gest_rec_thread.start()
@@ -106,7 +107,7 @@ def data_processing():
         if kill_threads == True:
             break
 
-        max_val_location_temp, saliency_map =calculate_ROI(frame, previous_max_val_location)
+        max_val_location_temp, saliency_map = calculate_ROI(frame, previous_max_val_location)
 
         if max_val_location_temp is not None:
             movement_list.append(np.sum(saliency_map/255))
@@ -132,6 +133,8 @@ def main():
     global entropy
     global vid
     global proc_thread
+    global ORIG_ROWS
+    global ORIG_COLS
 
     # keep track of how many frames have been read
     image_count = 0
@@ -150,11 +153,22 @@ def main():
         if kill_threads == True:
             break
         # read video frame from capture device
+        # shape of returned image is (rows, cols, 3)
+        # ret is True is there is a frame to read
         ret, frame_temp = vid.read()
+        # go to beginning of while loop if no frame is returned
+        if ret != True:
+            continue
+        # keep track of shape of returned image
+        ORIG_ROWS = frame_temp.shape[0]
+        ORIG_COLS = frame_temp.shape[1]
         # increment frame counter for keeping track
         image_count += 1 
-        # flip image, turn to gray, and resize down to 200x200
-        frame = cv2.resize(cv2.cvtColor(cv2.flip(frame_temp, 1), cv2.COLOR_BGR2GRAY), (ROWS,COLUMNS), interpolation=cv2.INTER_AREA)
+        # flip image, turn to gray, and resize down to COLSxROWS
+        frame = cv2.resize(cv2.cvtColor(cv2.flip(frame_temp, 1),
+                                         cv2.COLOR_BGR2GRAY),
+                                         (COLS,ROWS),
+                                         interpolation=cv2.INTER_AREA)
 
         # read max_val_location from signal processing thread
         if max_val_location is not None:
@@ -176,9 +190,12 @@ def main():
             except:
                 end_point_column = COLUMNS-1
             # create frame final by putting a rectangle on the small image
+            # rectangle points are described by (COLUMN, ROW)
             frame_final = cv2.rectangle(copy.deepcopy(frame),
                 (start_point_column, start_point_row), (end_point_column, end_point_row), (0,255,0), 2)
 
+        # resize processed image back to ORIG_ROWS/ORIG_COLS
+        # cv2 always goes by (width, height) meaning (cols, rows)
         try:
             frame_final = cv2.resize(frame_final, (ORIG_COLS, ORIG_ROWS), interpolation=cv2.INTER_AREA)
         except:

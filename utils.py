@@ -19,12 +19,9 @@ GLOBAL_ROI_ARRAY = []
 gaussian_kernel = 101
 median_kernel = 5
 KERNEL = 151
-ORIG_ROWS = 720
-ORIG_COLS = 1280
 ROWS = 200
-COLUMNS = 200
+COLS = 200
 COOL_DOWN_VAL = 20
-#q = 10
 
 blur_kernel = np.ones((KERNEL,KERNEL),np.float32)/(KERNEL*KERNEL)
 
@@ -62,7 +59,7 @@ def calculate_ROI(image1, previous_location):
     global GLOBAL_ROI_ARRAY
     if len(GLOBAL_ROI_ARRAY) > 10:
         GLOBAL_ROI_ARRAY = GLOBAL_ROI_ARRAY[1:]
-    diff_array = np.zeros((ROWS,COLUMNS), dtype=np.uint8)
+    diff_array = np.zeros((ROWS,COLS), dtype=np.uint8)
     if len(GLOBAL_ROI_ARRAY) > 5:
         diff_array = (abs(np.array(image1).astype(np.intc) - np.array(GLOBAL_ROI_ARRAY[-1]).astype(np.intc))).astype(np.uint8)
         diff_array = cv2.medianBlur(diff_array, median_kernel)
@@ -83,8 +80,19 @@ def calculate_ROI(image1, previous_location):
     
 
 def is_key_frame(movement_list):
-    if movement_list[-1] < ((movement_list[-2] + movement_list[-3] + movement_list[-4] + movement_list[-5]) / 5) * .7:
-        if movement_list[-1] > 500:
+    ## check if the amount of movement in the frame is less than N percent of the average of the past M frames 
+    ## if so, and if the total movement in the frame is greater than P, it is a key frame.
+    N = 0.7
+    M = 4
+    P = 1200
+
+    mvmt_avg = 0
+    for i in range(M):
+        mvmt_avg += movement_list[-2 - i]
+    mvmt_avg /= 4
+
+    if movement_list[-1] < mvmt_avg * .5:
+        if movement_list[-1] > P:
             return True
     else:
         return False
