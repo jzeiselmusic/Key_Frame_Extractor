@@ -3,6 +3,22 @@ from memory_profiler import profile
 
 ## global variables accessed by all threads
 kill_threads = False
+className = None
+
+## set up gesture recognition model
+##
+mpHands = mp.solutions.hands
+mpDraw = mp.solutions.drawing_utils
+# Initialize mediapipe model
+hands = mpHands.Hands(max_num_hands = 1, min_detection_confidence = 0.7)
+# Load gesture recognizer model
+model = load_model('mp_hand_gesture')
+# Load class names
+f = open('gesture.names', 'r')
+classNames = f.read().split('\n')
+f.close()
+##
+##
 
 ## start by emptying ./tmp folder
 saved_ims = [n for n in os.listdir('./tmp/') if n[0] != '.']
@@ -19,22 +35,41 @@ def signal_handler(signal, frame):
     kill_threads = True
     sys.exit(0)
 
+def gest_rec(cropped_image):
+    global className
+    # make classname global so that GUI thread can access it
+    x, y, c = cropped_image.shape
+    # Get hand landmark prediction
+    result = hands.process(cropped_image)
+    # post process the result
+    if result.multi_hand_landmarks:
+        landmarks = []
+        for handslms in result.multi_hand_landmarks:
+            for lm in handslms.landmark:
+                # print(id, lm)
+                lmx = int(lm.x * x)
+                lmy = int(lm.y * y)
+                landmarks.append([lmx,lmy])
+        # Predict gesture in Hand Gesture Recognition project
+        prediction = model.predict([landmarks], verbose=0)
+        classID = np.argmax(prediction)
+        className = classNames[classID]
+    else:
+        # hopefully, if GR does not find a gesture, it will print None
+        className = None
+
+
 def image_save(image, image_count, row_start, row_end, column_start, column_end):
     # flip image and expand ROI boundaries because the ROI was calculated using 200x200 instead of 720x1280
     rect_image = cv2.flip(image[int(row_start*3.7):int(row_end*3.7), int(column_start*6.4):int(column_end*6.4)], 1)
     try:
+        gest_rec_thread = threading.Thread(target=gest_rec, args=[rect_image])
+        gest_rec_thread.start()
         cv2.imwrite(f"./tmp/image_{image_count}.jpg", rect_image)
-        # if the write succeeds, there is an accurate image, and we can do gesture recognition on it
-        gest_rec_thread = threading.Thread(target=gesture_recognition, args=[rect_image]).start
     # sometimes the image write fails, maybe because the rectangle boundaries are off
     except Exception as e:
-        print("could not save image")
+        print("could not save or process image")
         print(e)
-
-
-def gesture_recognition(cropped_image):
-    # dont do anytthing yet
-    pass
 
 
 #@profile
@@ -83,15 +118,7 @@ def data_processing():
             max_val_location_y = calculate_linear_best_fit([int(n[1]) for n in max_val_input_tracker][-15:])
         
             max_val_location = (max_val_location_x, max_val_location_y)
-            #max_val_location = (9.2673e-03)*mvltnumpy + (7.4138e-02)*max_val_input_tracker[-1]\
-            #                    +(2.5948e-01)*max_val_input_tracker[-2] + (5.1897e-01)*max_val_input_tracker[-3]\
-            #                    +(6.4871e-01)*max_val_input_tracker[-4] + (5.1897e-01)*max_val_input_tracker[-5]\
-            #                    +(2.5948e-01)*max_val_input_tracker[-6] + (7.4138e-02)*max_val_input_tracker[-7]\
-            #                    +(9.2673e-03)*max_val_input_tracker[-8]\
-            #                    -(-6.1930e-16)*max_val_output_tracker[-1] - (1.0609e+00)*max_val_output_tracker[-2]\
-            #                    -(-4.4087e-16)*max_val_output_tracker[-3] - (2.9089e-01)*max_val_output_tracker[-4]\
-            #                    -(-6.8339e-17)*max_val_output_tracker[-5] - (2.0430e-02)*max_val_output_tracker[-6]\
-            #                    -(-2.0086e-18)*max_val_output_tracker[-7] - (1.7177e-04)*max_val_output_tracker[-8]
+
             max_val_output_tracker.append(max_val_location)
             max_val_output_tracker.pop(0)
             max_val_input_tracker.pop(0)
@@ -182,16 +209,15 @@ def main():
                     color, 
                     2, 
                     cv2.LINE_4)
-        cv2.putText(frame_final, 
-                    cooldown_text, 
-                    (50, 100), 
-                    font, 1, 
-                    color, 
-                    2, 
+        cv2.putText(frame_final,
+                    str(className),
+                    (50, 100),
+                    font, 1,
+                    color,
+                    2,
                     cv2.LINE_4)
         if saliency_map is not None:
             cv2.imshow('saliency map', saliency_map + 50)
-
         cv2.imshow('frame', frame_final)
         cv2.waitKey(1) & 0xFF
 
