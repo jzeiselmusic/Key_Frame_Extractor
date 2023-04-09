@@ -4,13 +4,17 @@ from memory_profiler import profile
 ## global variables accessed by all threads
 kill_threads = False
 className = None
+start_point_column = 0
+start_point_row = 0
+end_point_column = 0
+end_point_row = 0
 
 ## set up gesture recognition model
 ##
 mpHands = mp.solutions.hands
 mpDraw = mp.solutions.drawing_utils
 # Initialize mediapipe model
-hands = mpHands.Hands(max_num_hands = 1, min_detection_confidence = 0.7)
+hands = mpHands.Hands(max_num_hands = 1, min_detection_confidence = 0.5)
 # Load gesture recognizer model
 model = load_model('mp_hand_gesture')
 # Load class names
@@ -77,7 +81,7 @@ def image_save(image, image_count, row_start, row_end, column_start, column_end)
 def data_processing():
     global text
     global color
-    global cooldown
+    global cooldown_counter
     global keyframe
     global max_val_location_temp
     global max_val_location
@@ -86,10 +90,9 @@ def data_processing():
     ## this thread writes to these variables
     images = []
     entropy_vals = []
-    movement_list = [0,0,0,0,0]
+    movement_list = [0]*M
     keyframe = False
-    cooldown = True
-    cool_counter = 0
+    cooldown = False
     #
     #
     # initialize ROI inputs and outputs for filtering purposes
@@ -110,13 +113,26 @@ def data_processing():
         max_val_location_temp, saliency_map = calculate_ROI(frame, previous_max_val_location)
 
         if max_val_location_temp is not None:
-            movement_list.append(np.sum(saliency_map/255))
-            keyframe = is_key_frame(movement_list)
+            saliency_map_cropped = saliency_map[start_point_row:end_point_row,
+                                 start_point_column:end_point_column]
+            movement_list.append(np.sum(saliency_map_cropped/255))
+            print(np.sum(saliency_map_cropped/255))
+
+            if (cooldown == False):
+                keyframe = is_key_frame(movement_list, cooldown)
+                cooldown = keyframe
+            else:
+                keyframe = False
+                cooldown_counter = cooldown_counter - 1
+                if cooldown_counter == 0:
+                    cooldown = False
+                    cooldown_counter = MAX_COOLDOWN
+
             mvltnumpy = np.array(max_val_location_temp)
             max_val_input_tracker.append(mvltnumpy)
 
-            max_val_location_x = calculate_linear_best_fit([int(n[0]) for n in max_val_input_tracker][-15:])
-            max_val_location_y = calculate_linear_best_fit([int(n[1]) for n in max_val_input_tracker][-15:])
+            max_val_location_x = calculate_linear_best_fit([int(n[0]) for n in max_val_input_tracker][ - LINEAR_BEST_FIT_NUM_POINTS:])
+            max_val_location_y = calculate_linear_best_fit([int(n[1]) for n in max_val_input_tracker][ - LINEAR_BEST_FIT_NUM_POINTS:])
         
             max_val_location = (max_val_location_x, max_val_location_y)
 
@@ -135,6 +151,7 @@ def main():
     global proc_thread
     global ORIG_ROWS
     global ORIG_COLS
+    global start_point_column, start_point_row, end_point_column, end_point_row
 
     # keep track of how many frames have been read
     image_count = 0
@@ -174,19 +191,19 @@ def main():
         if max_val_location is not None:
             # use max_val_location to find ROI in rectangle
             try:
-                start_point_row = (int(max_val_location[0]) - int(KERNEL/2))
+                start_point_row = (int(max_val_location[0]) - int(RECT_ROWS/2))
             except:
                 start_point_row = 0
             try:
-                start_point_column = int(max_val_location[1]) - int(KERNEL/2)
+                start_point_column = int(max_val_location[1]) - int(RECT_COLS/2)
             except:
                 start_point_column = 0
             try:
-                end_point_row = int(max_val_location[0]) + int(KERNEL/2)
+                end_point_row = int(max_val_location[0]) + int(RECT_ROWS/2)
             except:
                 end_point_row = ROWS-1
             try:
-                end_point_column = int(max_val_location[1]) + int(KERNEL/2)
+                end_point_column = int(max_val_location[1]) + int(RECT_COLS/2)
             except:
                 end_point_column = COLUMNS-1
             # create frame final by putting a rectangle on the small image
@@ -217,8 +234,6 @@ def main():
                                                                     start_point_column, 
                                                                     end_point_column])
             save_thread.start()
-        cooldown_text = "cooldown" if cooldown==True else "active"
-        cooldown_color = (255,0,0) if cooldown==True else (0,255,255)
         cv2.putText(frame_final, 
                     text, 
                     (50, 50), 

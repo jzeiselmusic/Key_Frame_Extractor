@@ -18,10 +18,21 @@ from tensorflow.keras.models import load_model
 GLOBAL_ROI_ARRAY = []
 gaussian_kernel = 101
 median_kernel = 5
+RECT_ROWS = 100
+RECT_COLS = 100
 KERNEL = 151
 ROWS = 200
 COLS = 200
-COOL_DOWN_VAL = 20
+
+LINEAR_BEST_FIT_NUM_POINTS = 10
+
+MAX_COOLDOWN = 5
+cooldown_counter = MAX_COOLDOWN
+
+N = 0.45
+M = 3
+P_lo = 10
+P_hi = 6000
 
 blur_kernel = np.ones((KERNEL,KERNEL),np.float32)/(KERNEL*KERNEL)
 
@@ -79,20 +90,17 @@ def calculate_ROI(image1, previous_location):
         return None, None
     
 
-def is_key_frame(movement_list):
+def is_key_frame(movement_list, cooldown):
     ## check if the amount of movement in the frame is less than N percent of the average of the past M frames 
-    ## if so, and if the total movement in the frame is greater than P, it is a key frame.
-    N = 0.7
-    M = 4
-    P = 1200
+    ## if so, and if the total movement in the frame is greater than P_lo and smaller than P_hi, it is a key frame.
 
     mvmt_avg = 0
     for i in range(M):
         mvmt_avg += movement_list[-2 - i]
     mvmt_avg /= 4
 
-    if movement_list[-1] < mvmt_avg * .5:
-        if movement_list[-1] > P:
+    if movement_list[-1] < mvmt_avg * N:
+        if (movement_list[-1] > P_lo) and (movement_list[-1] < P_hi):
             return True
     else:
         return False
