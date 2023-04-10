@@ -18,11 +18,14 @@ from tensorflow.keras.models import load_model
 GLOBAL_ROI_ARRAY = []
 gaussian_kernel = 101
 median_kernel = 5
-RECT_ROWS = 100
-RECT_COLS = 100
+RECT_ROWS = 180
+RECT_COLS = 120
 KERNEL = 151
 ROWS = 200
 COLS = 200
+
+# seems to work way better at 2 than anything else.. not sure why
+DIFFARRAY_THRESH = 2
 
 LINEAR_BEST_FIT_NUM_POINTS = 10
 
@@ -75,8 +78,8 @@ def calculate_ROI(image1, previous_location):
         diff_array = (abs(np.array(image1).astype(np.intc) - np.array(GLOBAL_ROI_ARRAY[-1]).astype(np.intc))).astype(np.uint8)
         diff_array = cv2.medianBlur(diff_array, median_kernel)
         diff_array = cv2.GaussianBlur(diff_array, (gaussian_kernel, gaussian_kernel), 0)
-        diff_array[diff_array<2] = 0
-        diff_array[diff_array>2] = 255
+        diff_array[diff_array < DIFFARRAY_THRESH] = 0
+        diff_array[diff_array > DIFFARRAY_THRESH] = 255
         try:
             max_val_location = find_geographic_center(find_all_locations(diff_array))
         except:

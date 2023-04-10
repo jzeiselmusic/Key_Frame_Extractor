@@ -9,12 +9,18 @@ start_point_row = 0
 end_point_column = 0
 end_point_row = 0
 
+
+
+
+
 ## set up gesture recognition model
 ##
 mpHands = mp.solutions.hands
 mpDraw = mp.solutions.drawing_utils
 # Initialize mediapipe model
-hands = mpHands.Hands(max_num_hands = 1, min_detection_confidence = 0.5)
+hands = mpHands.Hands(static_image_mode = True,
+                      max_num_hands = 1,
+                      min_detection_confidence = 0.5)
 # Load gesture recognizer model
 model = load_model('mp_hand_gesture')
 # Load class names
@@ -23,13 +29,29 @@ classNames = f.read().split('\n')
 f.close()
 ##
 ##
-
-## start by emptying ./tmp folder
+##
+## start by emptying ./tmp and ./gest_tmp folder
 saved_ims = [n for n in os.listdir('./tmp/') if n[0] != '.']
 if len(saved_ims) > 0:
     for image in saved_ims:
         os.remove(f"./tmp/{image}")
 del saved_ims
+
+saved_gest_ims = [n for n in os.listdir('./gest_tmp/') if n[0] != '.']
+if len(saved_gest_ims) > 0:
+    for image in saved_gest_ims:
+        os.remove(f"./gest_tmp/{image}")
+del saved_gest_ims
+
+
+
+
+##
+##
+##
+
+
+
 
 def signal_handler(signal, frame):
     global kill_threads
@@ -39,10 +61,14 @@ def signal_handler(signal, frame):
     kill_threads = True
     sys.exit(0)
 
-def gest_rec(cropped_image):
+
+
+
+def gest_rec(cropped_image, image_count):
     global className
     # make classname global so that GUI thread can access it
     x, y, c = cropped_image.shape
+    cv2.imwrite(f"./gest_tmp/image_{image_count}.jpg", cropped_image)
     # Get hand landmark prediction
     result = hands.process(cropped_image)
     # post process the result
@@ -58,9 +84,14 @@ def gest_rec(cropped_image):
         prediction = model.predict([landmarks], verbose=0)
         classID = np.argmax(prediction)
         className = classNames[classID]
+        mpDraw.draw_landmarks(cropped_image, handslms, 
+                mpHands.HAND_CONNECTIONS)
+        cv2.imwrite(f"./gest_tmp/hand_image_{image_count}.jpg", cropped_image)
     else:
         # hopefully, if GR does not find a gesture, it will print None
         className = None
+
+
 
 
 def image_save(image, image_count, row_start, row_end, column_start, column_end):
@@ -68,13 +99,15 @@ def image_save(image, image_count, row_start, row_end, column_start, column_end)
     rect_image = cv2.flip(image[int(row_start*ORIG_ROWS/ROWS):int(row_end*ORIG_ROWS/ROWS),
                                  int(column_start*ORIG_COLS/COLS):int(column_end*ORIG_COLS/COLS)], 1)
     try:
-        gest_rec_thread = threading.Thread(target=gest_rec, args=[rect_image])
+        gest_rec_thread = threading.Thread(target=gest_rec, args=[rect_image, image_count])
         gest_rec_thread.start()
         cv2.imwrite(f"./tmp/image_{image_count}.jpg", rect_image)
     # sometimes the image write fails, maybe because the rectangle boundaries are off
     except Exception as e:
         print("could not save or process image")
         print(e)
+
+
 
 
 #@profile
@@ -143,6 +176,9 @@ def data_processing():
             previous_max_val_location = max_val_location
 
 
+
+
+
 #@profile
 def main():
     global frame
@@ -188,6 +224,7 @@ def main():
                                          interpolation=cv2.INTER_AREA)
 
         # read max_val_location from signal processing thread
+        frame_final = cv2.flip(copy.deepcopy(frame_temp), 1)
         if max_val_location is not None:
             # use max_val_location to find ROI in rectangle
             try:
@@ -206,17 +243,19 @@ def main():
                 end_point_column = int(max_val_location[1]) + int(RECT_COLS/2)
             except:
                 end_point_column = COLUMNS-1
-            # create frame final by putting a rectangle on the small image
-            # rectangle points are described by (COLUMN, ROW)
-            frame_final = cv2.rectangle(copy.deepcopy(frame),
-                (start_point_column, start_point_row), (end_point_column, end_point_row), (0,255,0), 2)
+            # create frame final by putting a rectangle on the large color image
+            # rectangle is resized to fit the original image
+            # rectangle points are described by (COLUMN, ROW) in every cv2 func
+            frame_final = cv2.rectangle(cv2.flip(copy.deepcopy(frame_temp), 1),
+                (int(start_point_column*ORIG_COLS/COLS), int(start_point_row*ORIG_ROWS/ROWS)),
+                 (int(end_point_column*ORIG_COLS/COLS), int(end_point_row*ORIG_ROWS/ROWS)), (0,255,0), 2)
 
         # resize processed image back to ORIG_ROWS/ORIG_COLS
         # cv2 always goes by (width, height) meaning (cols, rows)
-        try:
-            frame_final = cv2.resize(frame_final, (ORIG_COLS, ORIG_ROWS), interpolation=cv2.INTER_AREA)
-        except:
-            frame_final = cv2.resize(frame, (ORIG_COLS, ORIG_ROWS), interpolation=cv2.INTER_AREA)
+        #try:
+        #    frame_final = cv2.resize(frame_final, (ORIG_COLS, ORIG_ROWS), interpolation=cv2.INTER_AREA)
+        #except:
+        #    frame_final = cv2.resize(frame, (ORIG_COLS, ORIG_ROWS), interpolation=cv2.INTER_AREA)
         font = cv2.FONT_HERSHEY_SIMPLEX
 
         if keyframe == False:
@@ -257,6 +296,10 @@ def main():
     vid.release()
     cv2.destroyAllWindows()
     
+
+
+
+
 
 if __name__=="__main__":
     main()
