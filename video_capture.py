@@ -3,14 +3,16 @@ from memory_profiler import profile
 
 ## global variables accessed by all threads
 kill_threads = False
-className = None
+className = 'initializing'
 start_point_column = 0
 start_point_row = 0
 end_point_column = 0
 end_point_row = 0
 
 
+my_model = load_model("./model/saved_model_04_11")
 
+gest_list = ["palm", "ok", "thumb", "none"]
 
 
 ## set up gesture recognition model
@@ -67,7 +69,16 @@ def signal_handler(signal, frame):
 def gest_rec(cropped_image, image_count):
     global className
     # make classname global so that GUI thread can access it
-    x, y, c = cropped_image.shape
+    try:
+        new_image = cv2.resize(cropped_image, (224,224))[np.newaxis is None,:,:,:]
+        output = my_model.predict(new_image)[0]
+        max_val = np.argmax(output)
+        className = gest_list[max_val]
+        
+    except Exception as e:
+        print("Error")
+        print(e)
+    """x, y, c = cropped_image.shape
     cv2.imwrite(f"./gest_tmp/image_{image_count}.jpg", cropped_image)
     # Get hand landmark prediction
     result = hands.process(cropped_image)
@@ -89,7 +100,7 @@ def gest_rec(cropped_image, image_count):
         cv2.imwrite(f"./gest_tmp/hand_image_{image_count}.jpg", cropped_image)
     else:
         # hopefully, if GR does not find a gesture, it will print None
-        className = None
+        className = None"""
 
 
 
@@ -209,6 +220,12 @@ def main():
         # shape of returned image is (rows, cols, 3)
         # ret is True is there is a frame to read
         ret, frame_temp = vid.read()
+        try:
+            save_frame = cv2.flip(copy.deepcopy(frame_temp), 1)[int(start_point_row*ORIG_ROWS/ROWS):int(end_point_row*ORIG_ROWS/ROWS),
+                    int(start_point_column*ORIG_COLS/COLS):int(end_point_column*ORIG_COLS/COLS)]
+            cv2.imwrite(f"./frames_5/thumb_im_2_{image_count}.jpg", save_frame)
+        except:
+            pass
         # go to beginning of while loop if no frame is returned
         if ret != True:
             continue

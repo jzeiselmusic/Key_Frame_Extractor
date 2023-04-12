@@ -10,6 +10,8 @@ import threading
 import copy
 import os
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import mediapipe as mp
 import tensorflow as tf
 from tensorflow.keras.models import load_model
