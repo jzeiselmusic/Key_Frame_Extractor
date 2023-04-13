@@ -4,3 +4,4 @@ __pycache__
 *.txt
 *.docx
 *.mp4
+./output_vids/*

@@ -47,14 +47,6 @@ del saved_gest_ims
 
 
 
-
-##
-##
-##
-
-
-
-
 def signal_handler(signal, frame):
     global kill_threads
     print('Interrupted!')
@@ -78,30 +70,6 @@ def gest_rec(cropped_image, image_count):
     except Exception as e:
         print("Error")
         print(e)
-    """x, y, c = cropped_image.shape
-    cv2.imwrite(f"./gest_tmp/image_{image_count}.jpg", cropped_image)
-    # Get hand landmark prediction
-    result = hands.process(cropped_image)
-    # post process the result
-    if result.multi_hand_landmarks:
-        landmarks = []
-        for handslms in result.multi_hand_landmarks:
-            for lm in handslms.landmark:
-                # print(id, lm)
-                lmx = int(lm.x * x)
-                lmy = int(lm.y * y)
-                landmarks.append([lmx,lmy])
-        # Predict gesture in Hand Gesture Recognition project
-        prediction = model.predict([landmarks], verbose=0)
-        classID = np.argmax(prediction)
-        className = classNames[classID]
-        mpDraw.draw_landmarks(cropped_image, handslms, 
-                mpHands.HAND_CONNECTIONS)
-        cv2.imwrite(f"./gest_tmp/hand_image_{image_count}.jpg", cropped_image)
-    else:
-        # hopefully, if GR does not find a gesture, it will print None
-        className = None"""
-
 
 
 
@@ -117,7 +85,6 @@ def image_save(image, image_count, row_start, row_end, column_start, column_end)
     except Exception as e:
         print("could not save or process image")
         print(e)
-
 
 
 
@@ -157,10 +124,8 @@ def data_processing():
         max_val_location_temp, saliency_map = calculate_ROI(frame, previous_max_val_location)
 
         if max_val_location_temp is not None:
-            saliency_map_cropped = saliency_map[start_point_row:end_point_row,
-                                 start_point_column:end_point_column]
-            movement_list.append(np.sum(saliency_map_cropped/255))
-            print(np.sum(saliency_map_cropped/255))
+            movement_list.append(np.sum(saliency_map/255))
+            print(np.sum(saliency_map/255))
 
             if (cooldown == False):
                 keyframe = is_key_frame(movement_list, cooldown)
@@ -220,12 +185,6 @@ def main():
         # shape of returned image is (rows, cols, 3)
         # ret is True is there is a frame to read
         ret, frame_temp = vid.read()
-        try:
-            save_frame = cv2.flip(copy.deepcopy(frame_temp), 1)[int(start_point_row*ORIG_ROWS/ROWS):int(end_point_row*ORIG_ROWS/ROWS),
-                    int(start_point_column*ORIG_COLS/COLS):int(end_point_column*ORIG_COLS/COLS)]
-            cv2.imwrite(f"./frames_5/thumb_im_2_{image_count}.jpg", save_frame)
-        except:
-            pass
         # go to beginning of while loop if no frame is returned
         if ret != True:
             continue
@@ -245,19 +204,19 @@ def main():
         if max_val_location is not None:
             # use max_val_location to find ROI in rectangle
             try:
-                start_point_row = (int(max_val_location[0]) - int(RECT_ROWS/2))
+                start_point_row = max(int(max_val_location[0]) - int(RECT_ROWS/2), 0)
             except:
                 start_point_row = 0
             try:
-                start_point_column = int(max_val_location[1]) - int(RECT_COLS/2)
+                start_point_column = max(int(max_val_location[1]) - int(RECT_COLS/2), 0)
             except:
                 start_point_column = 0
             try:
-                end_point_row = int(max_val_location[0]) + int(RECT_ROWS/2)
+                end_point_row = min(int(max_val_location[0]) + int(RECT_ROWS/2), ROWS-1)
             except:
                 end_point_row = ROWS-1
             try:
-                end_point_column = int(max_val_location[1]) + int(RECT_COLS/2)
+                end_point_column = min(int(max_val_location[1]) + int(RECT_COLS/2), ROWS-1)
             except:
                 end_point_column = COLUMNS-1
             # create frame final by putting a rectangle on the large color image
@@ -267,12 +226,7 @@ def main():
                 (int(start_point_column*ORIG_COLS/COLS), int(start_point_row*ORIG_ROWS/ROWS)),
                  (int(end_point_column*ORIG_COLS/COLS), int(end_point_row*ORIG_ROWS/ROWS)), (0,255,0), 2)
 
-        # resize processed image back to ORIG_ROWS/ORIG_COLS
-        # cv2 always goes by (width, height) meaning (cols, rows)
-        #try:
-        #    frame_final = cv2.resize(frame_final, (ORIG_COLS, ORIG_ROWS), interpolation=cv2.INTER_AREA)
-        #except:
-        #    frame_final = cv2.resize(frame, (ORIG_COLS, ORIG_ROWS), interpolation=cv2.INTER_AREA)
+
         font = cv2.FONT_HERSHEY_SIMPLEX
 
         if keyframe == False:
@@ -283,12 +237,14 @@ def main():
             text = "KEY FRAME"
             color = (255, 0, 0)
             ## crop image by current rectangle value
-            save_thread = threading.Thread(target=image_save, args=[frame_temp, 
-                                                                    image_count, 
-                                                                    start_point_row, 
-                                                                    end_point_row, 
-                                                                    start_point_column, 
-                                                                    end_point_column])
+            save_thread = threading.Thread(
+                                target=image_save,
+                                args=[frame_temp, 
+                                image_count, 
+                                start_point_row, 
+                                end_point_row, 
+                                start_point_column, 
+                                end_point_column])
             save_thread.start()
         cv2.putText(frame_final, 
                     text, 

@@ -70,7 +70,7 @@ def image_save(image, image_count, row_start, row_end, column_start, column_end)
         cv2.imwrite(f"./tmp/image_{image_count}.jpg", rect_image)
     # sometimes the image write fails, maybe because the rectangle boundaries are off
     except Exception as e:
-        pass
+        print(e)
 
 
 
@@ -109,10 +109,8 @@ def data_processing():
         except:
             continue
         if max_val_location_temp is not None:
-            saliency_map_cropped = saliency_map[start_point_row:end_point_row,
-                                 start_point_column:end_point_column]
-            movement_list.append(np.sum(saliency_map_cropped/255))
-            print(np.sum(saliency_map_cropped/255))
+            movement_list.append(np.sum(saliency_map/255))
+            print(np.sum(saliency_map/255))
 
             if (cooldown == False):
                 keyframe = is_key_frame(movement_list, cooldown)
@@ -172,12 +170,7 @@ def main():
         # shape of returned image is (rows, cols, 3)
         # ret is True is there is a frame to read
         ret, frame_temp = vid.read()
-        try:
-            save_frame = frame_temp[int(start_point_row*ORIG_ROWS/ROWS):int(end_point_row*ORIG_ROWS/ROWS),
-                    int(start_point_column*ORIG_COLS/COLS):int(end_point_column*ORIG_COLS/COLS)]
-            cv2.imwrite(f"./frames_5/thumb_im_2_{image_count}.jpg", save_frame)
-        except:
-            pass
+        time.sleep(0.0001)
         # go to beginning of while loop if no frame is returned
         if ret != True:
             continue
@@ -197,19 +190,19 @@ def main():
         if max_val_location is not None:
             # use max_val_location to find ROI in rectangle
             try:
-                start_point_row = (int(max_val_location[0]) - int(RECT_ROWS/2))
+                start_point_row = max((int(max_val_location[0]) - int(RECT_ROWS/2)),0)
             except:
                 start_point_row = 0
             try:
-                start_point_column = int(max_val_location[1]) - int(RECT_COLS/2)
+                start_point_column = max(int(max_val_location[1]) - int(RECT_COLS/2),0)
             except:
                 start_point_column = 0
             try:
-                end_point_row = int(max_val_location[0]) + int(RECT_ROWS/2)
+                end_point_row = min(int(max_val_location[0]) + int(RECT_ROWS/2), ROWS-1)
             except:
                 end_point_row = ROWS-1
             try:
-                end_point_column = int(max_val_location[1]) + int(RECT_COLS/2)
+                end_point_column = min(int(max_val_location[1]) + int(RECT_COLS/2), ROWS-1)
             except:
                 end_point_column = COLUMNS-1
             # create frame final by putting a rectangle on the large color image

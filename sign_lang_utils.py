@@ -9,6 +9,7 @@ import sys
 import threading
 import copy
 import os
+import time
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -27,18 +28,18 @@ ROWS = 200
 COLS = 200
 
 # seems to work way better at 2 than anything else.. not sure why
-DIFFARRAY_THRESH_LO = 2
-DIFFARRAY_THRESH_HI = 2
+DIFFARRAY_THRESH_LO = 10
+DIFFARRAY_THRESH_HI = 10
 
-LINEAR_BEST_FIT_NUM_POINTS = 15
+LINEAR_BEST_FIT_NUM_POINTS = 25
 
-MAX_COOLDOWN = 5
+MAX_COOLDOWN = 10
 cooldown_counter = MAX_COOLDOWN
 
-N = 0.5
-M = 2
-P_lo = 2.0
-P_hi = 1000
+N = 0.6
+M = 3
+P_lo = 0.0
+P_hi = 2000
 
 blur_kernel = np.ones((KERNEL,KERNEL),np.float32)/(KERNEL*KERNEL)
 
@@ -81,14 +82,12 @@ def calculate_ROI(image1, previous_location):
         diff_array = (abs(np.array(image1).astype(np.intc) - np.array(GLOBAL_ROI_ARRAY[-1]).astype(np.intc))).astype(np.uint8)
         diff_array = cv2.medianBlur(diff_array, median_kernel)
         diff_array = cv2.GaussianBlur(diff_array, (gaussian_kernel, gaussian_kernel), 0)
-        diff_array[diff_array < DIFFARRAY_THRESH_LO] = 0
-        diff_array[diff_array > DIFFARRAY_THRESH_HI] = 255
+        diff_array[diff_array < DIFFARRAY_THRESH_LO] = 0.0
+        diff_array[diff_array > DIFFARRAY_THRESH_HI] = 255.0
         try:
             max_val_location = find_geographic_center(find_all_locations(diff_array))
         except:
             max_val_location = previous_location
-        #max_val_location = np.argmax(diff_array)
-        #max_val_location = (int(max_val_location / ROWS), int(max_val_location % COLUMNS))
         GLOBAL_ROI_ARRAY.append(image1)
         return max_val_location, diff_array
     else:
@@ -108,5 +107,16 @@ def is_key_frame(movement_list, cooldown):
     if movement_list[-1] < mvmt_avg * N:
         if (movement_list[-1] >= P_lo) and (movement_list[-1] <= P_hi):
             return True
+    else:
+        return False
+
+
+def is_key_frame_entropy(movement_list, cooldown):
+    former_entropy_val = calculate_entropy(movement_list[-2])
+    former_former_entropy_val = calculate_entropy(movement_list[-3])
+    current_entropy_val = calculate_entropy(movement_list[-1])
+    if (former_entropy_val > former_former_entropy_val and former_entropy_val > current_entropy_val) or\
+            (former_entropy_val < former_former_entropy_val and former_entropy_val < current_entropy_val):
+        return True
     else:
         return False
