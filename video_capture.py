@@ -1,4 +1,6 @@
+## much of the image processing code is in utils.py
 from utils import *
+## used for checking memory leaks. Comment out if unused
 from memory_profiler import profile
 
 ## global variables accessed by all threads
